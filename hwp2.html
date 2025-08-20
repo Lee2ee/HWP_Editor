@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HWP → JSON Extractor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      background: #f8fafc;
+      color: #334155;
+    }
+
+    .app-header {
+      background: white;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .app-header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #4f46e5;
+    }
+
+    .app-header nav button {
+      background: none;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      margin-left: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .app-header nav button:hover {
+      background: #f3f4f6;
+    }
+
+    .layout {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .left {
+      flex: 0 0 35%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .right {
+      flex: 1;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border: 1px solid #e2e8f0;
+    }
+
+    .card h2 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #1e293b;
+    }
+
+    /* 드롭존 */
+    .dropzone {
+      border: 2px dashed #d1d5db;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #fafafa;
+    }
+
+    .dropzone:hover, .dropzone.hover {
+      border-color: #4f46e5;
+      background: #f0f7ff;
+    }
+
+    .dropzone p {
+      margin-bottom: 1rem;
+      color: #6b7280;
+    }
+
+    .dropzone button {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.75rem 1.5rem;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .dropzone button:hover {
+      background: #4338ca;
+    }
+
+    .meta {
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+
+    /* 진행률 바 */
+    .progress {
+      width: 100%;
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .progress .bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4f46e5, #7c3aed);
+      transition: width 0.3s ease;
+      border-radius: 4px;
+    }
+
+    .progress-label {
+      font-size: 0.875rem;
+      color: #6b7280;
+    }
+
+    /* JSON 뷰어 */
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .actions button, .actions label {
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .actions button:hover, .actions label:hover {
+      background: #e5e7eb;
+    }
+
+    .actions button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .json {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 6px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.75rem;
+      line-height: 1.4;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .json:empty::before {
+      content: "JSON 데이터가 표시됩니다...";
+      color: #64748b;
+      font-style: italic;
+    }
+
+    /* 에디터 영역 */
+    .editor-container {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      min-height: 400px;
+      margin-bottom: 1rem;
+    }
+
+    .ck-editor__editable {
+      min-height: 350px;
+    }
+
+    /* 토스트 */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      max-width: 400px;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      border-left: 4px solid #16a34a;
+    }
+
+    .toast.warn {
+      border-left: 4px solid #f59e0b;
+    }
+
+    .toast.error {
+      border-left: 4px solid #dc2626;
+    }
+
+    /* 반응형 */
+    @media (max-width: 1024px) {
+      .layout {
+        flex-direction: column;
+      }
+      
+      .left {
+        flex: none;
+      }
+    }
+
+    /* 모달 */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .modal-header h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.25rem;
+      border-radius: 4px;
+    }
+
+    .close-btn:hover {
+      background: #f3f4f6;
+    }
+
+    .sync-btn {
+      background: #16a34a !important;
+      color: white !important;
+      border-color: #16a34a !important;
+    }
+
+    .sync-btn:hover {
+      background: #15803d !important;
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>HWP → JSON Extractor</h1>
+    <nav>
+      <button id="helpBtn">도움말</button>
+      <button id="settingsBtn">설정</button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="left">
+      <div class="card">
+        <h2>파일 업로드</h2>
+        <div id="dropzone" class="dropzone" tabindex="0" aria-label="HWP 파일 드롭 또는 선택">
+          <p>.hwp 파일을 여기로 드래그하거나 클릭하여 선택</p>
+          <input id="fileInput" type="file" accept=".hwp" hidden />
+          <button id="fileBtn">파일 선택</button>
+        </div>
+        <div class="meta">
+          <span id="fileName">파일 없음</span> · <span id="fileSize">0 KB</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>진행 상태</h2>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="progressBar" class="bar" style="width:0%"></div>
+        </div>
+        <div id="progressLabel" class="progress-label">대기 중</div>
+      </div>
+
+      <div class="card">
+        <h2>JSON 뷰어</h2>
+            <div class="actions">
+            <button id="downloadJson" disabled>다운로드</button>
+            <button id="saveLocal" disabled>저장</button>
+            <button id="loadLocal">불러오기</button>
+            <label class="upload-json">
+                JSON 업로드<input id="uploadJson" type="file" accept="application/json,.json" hidden />
+            </label>
+            <button id="sendJson" disabled>JSON 전송</button>
+            </div>
+        <pre id="jsonView" class="json"></pre>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="card">
+        <h2>에디터</h2>
+        <div id="editor" class="editor-container"></div>
+        <div class="actions">
+          <button id="syncBtn" class="sync-btn" disabled>에디터 → JSON 반영</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 토스트 알림 -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- 도움말 모달 -->
+  <div id="helpModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>사용 방법</h3>
+        <button class="close-btn" onclick="closeModal('helpModal')">&times;</button>
+      </div>
+      <div>
+        <h4>1. 파일 업로드</h4>
+        <p>HWP 파일을 드래그하거나 파일 선택 버튼으로 업로드하세요.</p>
+        
+        <h4>2. 텍스트 추출</h4>
+        <p>자동으로 HWP 파일에서 텍스트를 추출하여 JSON 형태로 변환합니다.</p>
+        
+        <h4>3. 편집 및 저장</h4>
+        <p>추출된 텍스트를 에디터에서 편집하고, JSON으로 저장하거나 다운로드할 수 있습니다.</p>
+        
+        <p><strong>주의:</strong> 현재는 데모 버전으로 실제 HWP 파일 파싱 대신 샘플 텍스트를 표시합니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CKEditor CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ckeditor5/40.0.0/ckeditor.min.js"></script>
+
+  <script>
+    let editor;
+    let currentJson = null;
+
+    // 전역 변수 및 초기화
+    const elements = {
+      dropzone: document.getElementById('dropzone'),
+      fileInput: document.getElementById('fileInput'),
+      fileBtn: document.getElementById('fileBtn'),
+      fileName: document.getElementById('fileName'),
+      fileSize: document.getElementById('fileSize'),
+      progressBar: document.getElementById('progressBar'),
+      progressLabel: document.getElementById('progressLabel'),
+      jsonView: document.getElementById('jsonView'),
+      downloadJson: document.getElementById('downloadJson'),
+      saveLocal: document.getElementById('saveLocal'),
+      loadLocal: document.getElementById('loadLocal'),
+      uploadJson: document.getElementById('uploadJson'),
+      syncBtn: document.getElementById('syncBtn'),
+      toast: document.getElementById('toast'),
+      helpBtn: document.getElementById('helpBtn'),
+      settingsBtn: document.getElementById('settingsBtn'),
+      sendJson: document.getElementById('sendJson')
+    };
+
+    // CKEditor 초기화
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        editor = await ClassicEditor.create(document.querySelector('#editor'), {
+          toolbar: [
+            'heading', '|',
+            'bold', 'italic', 'underline', '|',
+            'bulletedList', 'numberedList', '|',
+            'outdent', 'indent', '|',
+            'undo', 'redo', '|',
+            'findAndReplace'
+          ],
+          placeholder: '추출된 텍스트가 여기에 표시됩니다...'
+        });
+        
+        editor.model.document.on('change:data', () => {
+          if (currentJson) {
+            elements.syncBtn.disabled = false;
+          }
+        });
+      } catch (error) {
+        console.error('CKEditor 초기화 실패:', error);
+        toast('에디터 초기화에 실패했습니다.', 'error');
+      }
+    });
+
+    // 진행률 업데이트
+    function updateProgress(percent, label) {
+      elements.progressBar.style.width = `${percent}%`;
+      elements.progressBar.parentElement.setAttribute('aria-valuenow', String(percent));
+      elements.progressLabel.textContent = label || '';
+    }
+
+    // 토스트 메시지
+    function toast(message, type = 'success') {
+      elements.toast.textContent = message;
+      elements.toast.className = `toast ${type} show`;
+      
+      setTimeout(() => {
+        elements.toast.classList.remove('show');
+      }, 3000);
+    }
+
+    // 드롭존 이벤트 처리
+    ['dragenter', 'dragover'].forEach(eventName => {
+      elements.dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        elements.dropzone.classList.add('hover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      elements.dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        elements.dropzone.classList.remove('hover');
+      });
+    });
+
+    elements.dropzone.addEventListener('drop', (e) => {
+      handleFiles(e.dataTransfer.files);
+    });
+
+    elements.dropzone.addEventListener('click', () => {
+      elements.fileInput.click();
+    });
+
+    elements.fileBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      elements.fileInput.click();
+    });
+
+    elements.fileInput.addEventListener('change', (e) => {
+      handleFiles(e.target.files);
+    });
+
+    // 파일 처리
+    async function handleFiles(files) {
+      // 데모 버전: 실제 서버 없이 샘플 텍스트만 표시
+      const file = files && files[0];
+      if (!file) {
+        toast('파일을 선택해주세요.', 'warn');
+        return;
+      }
+      if (!file.name.toLowerCase().endsWith('.hwp')) {
+        toast('HWP 파일만 지원됩니다.', 'warn');
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) { // 50MB 제한
+        toast('파일 크기가 너무 큽니다. (최대 50MB)', 'warn');
+        return;
+      }
+      // UI 업데이트
+      elements.fileName.textContent = file.name;
+      elements.fileSize.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+      try {
+        updateProgress(10, '파일 읽는 중...');
+        await new Promise(resolve => setTimeout(resolve, 500)); // 시뮬레이션
+        // 실제 구현에서는 HWP 파서 라이브러리로 파싱 필요
+        updateProgress(30, '텍스트 추출 중...');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 시뮬레이션
+        const sampleText = `문서 제목: ${file.name.replace('.hwp', '')}
+
+이것은 HWP 파일에서 추출된 샘플 텍스트입니다.
+
+실제 구현에서는 브라우저용 HWP 파서 라이브러리를 사용하여 
+다음과 같은 정보를 추출할 수 있습니다:
+
+1. 문서의 모든 텍스트 내용
+2. 표 안의 텍스트
+3. 머리글/바닥글 텍스트
+4. 각주 텍스트
+
+현재는 데모 버전으로 샘플 텍스트를 표시합니다.
+
+문단 1: 여기에 실제 문서의 첫 번째 문단이 들어갑니다.
+
+문단 2: 여기에 실제 문서의 두 번째 문단이 들어갑니다.
+
+결론: 이상으로 문서 추출이 완료되었습니다.`;
+        updateProgress(80, 'JSON 구성 중...');
+        currentJson = {
+          filename: file.name,
+          size: file.size,
+          extractedAt: new Date().toISOString(),
+          meta: {
+            pages: Math.ceil(sampleText.length / 2000), // 추정 페이지 수
+            title: file.name.replace('.hwp', ''),
+            warnings: ['데모 버전: 실제 HWP 파싱이 아닌 샘플 텍스트입니다.']
+          },
+          content: sampleText
+        };
+        renderJson(currentJson);
+        if (editor) {
+          editor.setData(currentJson.content.replace(/\n/g, '<br>'));
+        }
+        // UI 활성화
+        elements.downloadJson.disabled = false;
+        elements.saveLocal.disabled = false;
+        elements.syncBtn.disabled = false;
+        updateProgress(100, '완료!');
+        toast('텍스트 추출이 완료되었습니다!');
+      } catch (error) {
+        console.error('파일 처리 오류:', error);
+        updateProgress(0, '실패');
+        toast('파일 처리 중 오류가 발생했습니다.', 'error');
+      }
+    }
+
+    // JSON 렌더링
+    function renderJson(obj) {
+      elements.jsonView.textContent = JSON.stringify(obj, null, 2);
+    }
+
+    // JSON 다운로드
+    elements.downloadJson.addEventListener('click', () => {
+      if (!currentJson) {
+        toast('다운로드할 JSON 데이터가 없습니다.', 'warn');
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(currentJson, null, 2)], {
+        type: 'application/json'
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentJson.filename || 'extracted'}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast('JSON 파일이 다운로드되었습니다.');
+    });
+
+    // LocalStorage 저장
+    elements.saveLocal.addEventListener('click', () => {
+      if (!currentJson) {
+        toast('저장할 JSON 데이터가 없습니다.', 'warn');
+        return;
+      }
+
+      try {
+        const saved = JSON.parse(localStorage.getItem('hwp_json_list') || '[]');
+        const newItem = {
+          id: Date.now(),
+          filename: currentJson.filename,
+          savedAt: new Date().toISOString(),
+          data: currentJson
+        };
+        
+        saved.unshift(newItem);
+        
+        // 최대 10개까지만 보관
+        if (saved.length > 10) {
+          saved.splice(10);
+        }
+        
+        localStorage.setItem('hwp_json_list', JSON.stringify(saved));
+        toast('LocalStorage에 저장되었습니다.');
+      } catch (error) {
+        console.error('저장 오류:', error);
+        toast('저장에 실패했습니다. (용량 초과?)', 'error');
+      }
+    });
+
+    // LocalStorage 불러오기
+    elements.loadLocal.addEventListener('click', () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('hwp_json_list') || '[]');
+        
+        if (saved.length === 0) {
+          toast('저장된 데이터가 없습니다.', 'warn');
+          return;
+        }
+
+        // 가장 최근 항목 불러오기
+        const latest = saved[0];
+        currentJson = latest.data;
+        
+        renderJson(currentJson);
+        
+        if (editor) {
+          editor.setData(currentJson.content.replace(/\n/g, '<br>'));
+        }
+
+        // UI 업데이트
+        elements.fileName.textContent = currentJson.filename;
+        elements.fileSize.textContent = `${(currentJson.size / 1024).toFixed(1)} KB`;
+        elements.downloadJson.disabled = false;
+        elements.saveLocal.disabled = false;
+        elements.syncBtn.disabled = false;
+
+        toast('데이터를 불러왔습니다.');
+      } catch (error) {
+        console.error('불러오기 오류:', error);
+        toast('불러오기에 실패했습니다.', 'error');
+      }
+    });
+
+    // JSON 파일 업로드
+    elements.uploadJson.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        
+        // 기본 구조 검증
+        if (!json.filename || !json.content) {
+          toast('올바른 JSON 구조가 아닙니다.', 'warn');
+          return;
+        }
+
+        currentJson = json;
+        renderJson(currentJson);
+        
+        if (editor) {
+          editor.setData(currentJson.content.replace(/\n/g, '<br>'));
+        }
+
+        // UI 업데이트
+        elements.fileName.textContent = currentJson.filename;
+        elements.fileSize.textContent = `${(currentJson.size || 0) / 1024}KB`;
+        elements.downloadJson.disabled = false;
+        elements.saveLocal.disabled = false;
+        elements.syncBtn.disabled = false;
+
+        toast('JSON 파일을 불러왔습니다.');
+      } catch (error) {
+        console.error('JSON 파일 읽기 오류:', error);
+        toast('JSON 파일을 읽을 수 없습니다.', 'error');
+      }
+
+      // 입력 초기화
+      e.target.value = '';
+    });
+
+    // 에디터 → JSON 반영
+    elements.syncBtn.addEventListener('click', () => {
+      if (!currentJson || !editor) {
+        toast('동기화할 데이터가 없습니다.', 'warn');
+        return;
+      }
+
+      const editorContent = editor.getData();
+      // HTML 태그 제거하여 순수 텍스트만 추출
+      const textContent = editorContent.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ');
+      
+      currentJson.content = textContent;
+      currentJson.extractedAt = new Date().toISOString(); // 수정 시간 업데이트
+      
+      renderJson(currentJson);
+      toast('에디터 내용이 JSON에 반영되었습니다.');
+      
+      elements.syncBtn.disabled = true;
+    });
+
+    // 모달 관련
+    elements.helpBtn.addEventListener('click', () => {
+      document.getElementById('helpModal').classList.add('show');
+    });
+
+    elements.settingsBtn.addEventListener('click', () => {
+      toast('설정 기능은 준비 중입니다.', 'warn');
+    });
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('show');
+    }
+
+    // 모달 외부 클릭 시 닫기
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal')) {
+        e.target.classList.remove('show');
+      }
+    });
+
+    // 키보드 접근성
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal.show').forEach(modal => {
+          modal.classList.remove('show');
+        });
+      }
+    });
+
+    // 초기 상태 설정
+    updateProgress(0, '대기 중');
+
+    elements.sendJson.addEventListener('click', async () => {
+        if (!currentJson) {
+            toast('전송할 JSON 데이터가 없습니다.', 'warn');
+            return;
+        }
+
+        try {
+            const res = await fetch('/save-json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentJson)
+            });
+
+            if (!res.ok) {
+            throw new Error('전송 실패');
+            }
+
+            toast('JSON 전송이 완료되었습니다.');
+        } catch (error) {
+            console.error('JSON 전송 오류:', error);
+            toast('JSON 전송 중 오류가 발생했습니다.', 'error');
+        }
+        });
+  </script>
+</body>
+</html>
